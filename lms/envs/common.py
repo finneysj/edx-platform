@@ -159,7 +159,12 @@ MITX_FEATURES = {
     'ENABLE_SHOPPING_CART': False,
 
     # Toggle storing detailed billing information
-    'STORE_BILLING_INFO': False
+    'STORE_BILLING_INFO': False,
+
+    # Allow badges to be visible in courseware at /badges and beneath progress graph
+    'ENABLE_STUDENT_BADGE_DISPLAY_COURSEWARE': False,
+    # Allow badges to be visible at /badges_profile
+    'ENABLE_STUDENT_BADGE_DISPLAY_DASHBOARD': False,
 }
 
 # Used for A/B testing
