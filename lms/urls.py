@@ -453,12 +453,6 @@ if settings.MITX_FEATURES.get('AUTOMATIC_AUTH_FOR_TESTING'):
         url(r'^auto_auth$', 'student.views.auto_auth'),
     )
 
-#Prototype page which displays to a student all badges they have earned.
-if settings.MITX_FEATURES.get('ENABLE_STUDENT_BADGE_DISPLAY_DASHBOARD', False):
-    urlpatterns += (
-        url(r'^badges_profile$', 'student.views.badges_profile', name="badges_profile"),
-    )
-
 urlpatterns = patterns(*urlpatterns)
 
 if settings.DEBUG:
