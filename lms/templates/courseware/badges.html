@@ -99,7 +99,7 @@ $(document).ready(function() {
 
       %if len(badgeclasses) != 0 or len(badges) != 0:
       <ol class="chapters">
-        %if len(badges) >= 0:
+        %if len(badges) > 0:
         <li>
           <h2>${_("Earned")}</h2>
           <ol class="sections">
@@ -168,7 +168,7 @@ $(document).ready(function() {
           </ol>
         </li>
         %endif
-        %if len(badgeclasses) >= len(badges):
+        %if len(badgeclasses) > len(badges):
         <li>
           <h2>${_('Unlockable')}</h2>
           <ol class="sections">

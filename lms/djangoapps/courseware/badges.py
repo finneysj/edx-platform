@@ -15,35 +15,31 @@ def _fetch(url):
     If the fetched JSON object is a paginated list -- with the next url at 'next' and the content at 'results' --
     this reads through all of the pages, and compiles the results together into one list.
 
-    Prints an error message if unsuccessful.
+    Throws a RequestException if unsuccessful.
     """
 
     # Create absolute URL from relative URL.
     if not settings.BADGE_SERVICE_URL in url:
         url = settings.BADGE_SERVICE_URL + url
 
-    try:
-        obj = requests.get(url, timeout=10).json  # pylint: disable=E1103
+    obj = requests.get(url, timeout=10).json  # pylint: disable=E1103
 
-        results = obj.get('results', None)
+    results = obj.get('results', None)
 
-        # Ensure that next results are obtained, if the output was paginated.
-        if results is not None:
-            next_url = obj.get('next', None)
+    # Ensure that next results are obtained, if the output was paginated.
+    if results is not None:
+        next_url = obj.get('next', None)
 
-            while next_url is not None:
-                next_obj = requests.get(next_url, timeout=10).json  # pylint: disable=E1103
-                results.extend(next_obj.get('results', []))
-                next_url = next_obj.get('next', None)
+        while next_url is not None:
+            next_obj = requests.get(next_url, timeout=10).json  # pylint: disable=E1103
+            results.extend(next_obj.get('results', []))
+            next_url = next_obj.get('next', None)
 
-            return results
+        return results
 
-        else:
-            return obj
+    else:
+        return obj
 
-    except requests.exceptions.RequestException:
-        print 'Badge service inaccessible? URL not found -- {url}'.format(url=str(url))
-        return []
 
 
 def make_badge_data(email, course_id=None):
@@ -64,56 +60,66 @@ def make_badge_data(email, course_id=None):
             each earned badge may be accessed, at the badge service
     """
 
-    if course_id is not None:
+    try:
+        if course_id is not None:
 
-        # Filter badges by the student's email and by the course ID.
-        badges_url = 'v1/badges/.json?badgeclass__issuer__course={course}&email={email}'
-        raw_badges = _fetch(badges_url.format(course=course_id, email=email))
+            # Filter badges by the student's email and by the course ID.
+            badges_url = 'v1/badges/.json?badgeclass__issuer__course={course}&email={email}'
+            raw_badges = _fetch(badges_url.format(course=course_id, email=email))
 
-        # Get the list of all badgeclasses for this course.
-        raw_badgeclasses = _fetch('v1/badgeclasses/.json?issuer__course={course}'.format(course=course_id))
+            # Get the list of all badgeclasses for this course.
+            raw_badgeclasses = _fetch('v1/badgeclasses/.json?issuer__course={course}'.format(course=course_id))
 
-    else:
-        # No course: only filter badges by the student's email, and display no unearned badges.
-        badges_url = 'v1/badges/.json?email={email}'
-        raw_badges = _fetch(badges_url.format(email=email))
+        else:
+            # No course: only filter badges by the student's email, and display no unearned badges.
+            badges_url = 'v1/badges/.json?email={email}'
+            raw_badges = _fetch(badges_url.format(email=email))
 
-        raw_badgeclasses = [
-            _fetch(badge['badge'])
+            raw_badgeclasses = [
+                _fetch(badge['badge'])
+                for badge in raw_badges
+            ]
+
+        # Format badgeclasses into a dictionary -- badgeclass_url: badgeclass_data
+        badgeclasses = dict([
+            (badgeclass['edx_href'], badgeclass)
+            for badgeclass in raw_badgeclasses
+        ])
+
+        # Format badges into a dictionary -- badgeclass_url: badge_data
+        badges = dict([
+            (badge['badge'], badge)
             for badge in raw_badges
+        ])
+
+        # Get the list of URLs to access to export badges to Mozilla.
+        badge_urls = [
+            badge['edx_href']
+            for badge in badges.values()
+            if badge is not None and 'edx_href' in badge
         ]
 
-    # Format badgeclasses into a dictionary -- badgeclass_url: badgeclass_data
-    badgeclasses = dict([
-        (badgeclass['edx_href'], badgeclass)
-        for badgeclass in raw_badgeclasses
-    ])
+        # Fetch data about the issuer.
+        issuers = {}
+        for badgeclass in badgeclasses.values():
+            issuer_url = badgeclass['issuer']
+            if issuer_url not in issuers.keys():
+                issuers.update({issuer_url: _fetch(issuer_url)})
 
-    # Format badges into a dictionary -- badgeclass_url: badge_data
-    badges = dict([
-        (badge['badge'], badge)
-        for badge in raw_badges
-    ])
+        output = {
+            'badges': badges,
+            'badgeclasses': badgeclasses,
+            'issuers': issuers,
+            'badge_urls': json.dumps(badge_urls),
+        }
 
-    # Get the list of URLs to access to export badges to Mozilla.
-    badge_urls = [
-        badge['edx_href']
-        for badge in badges.values()
-        if badge is not None and 'edx_href' in badge
-    ]
+        return output
 
-    # Fetch data about the issuer.
-    issuers = {}
-    for badgeclass in badgeclasses.values():
-        issuer_url = badgeclass['issuer']
-        if issuer_url not in issuers.keys():
-            issuers.update({issuer_url: _fetch(issuer_url)})
-
-    output = {
-        'badges': badges,
-        'badgeclasses': badgeclasses,
-        'issuers': issuers,
-        'badge_urls': json.dumps(badge_urls),
-    }
-
-    return output
+    except requests.exceptions.RequestException:
+        print 'Warning: Badge service inaccessible? Failed to locate badges.'
+        return {
+            'badges': {},
+            'badgeclasses': {},
+            'issuers': {},
+            'badge_urls': json.dumps([]),
+        }

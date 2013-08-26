@@ -1,10 +1,12 @@
 """
 Contains tests for courseware/badges.py
 """
+# Allow accessing protected function _fetch in badges.py:
 # pylint: disable=W0212
 
 from mock import MagicMock
 import json
+import requests
 
 from django.test import TestCase
 
@@ -25,8 +27,6 @@ class BlankBadgeDataTestCase(TestCase):
             """
             if 's/.json' in url:  # list endpoint
                 return []
-            elif '/.json' in url:  # not a list endpoint
-                return {}
             else:
                 return {}
         self.old_fetch, badges._fetch = (badges._fetch, temp_fetch)
@@ -56,7 +56,46 @@ class BlankBadgeDataTestCase(TestCase):
         badges._fetch = self.old_fetch
 
 
-class MakeBadgeDataTestCase(TestCase):
+class FailingBadgeTestCase(TestCase):
+    """
+    Test that badges.make_badge_data behaves correctly when _fetch throws RequestExceptions.
+    """
+    def setUp(self):
+        """
+        Mock the _fetch() method to throw a RequestException, to simulate what happens
+        when the requests library is unable to access the badge server.
+        """
+        def temp_fetch(url):
+            raise requests.exceptions.RequestException()
+
+        self.old_fetch, badges._fetch = (badges._fetch, temp_fetch)
+
+    def test_failing_with_course(self):
+        """
+        In the case when a course is passed to make_badge_data -- test that make_badge_data catches the exception
+        and returns blank data.
+        """
+        obtained_output = badges.make_badge_data("", "")
+        ideal_output = {'issuers': {}, 'badge_urls': '[]', 'badges': {}, 'badgeclasses': {}}
+        self.assertEquals(obtained_output, ideal_output)
+
+    def test_failing_without_course(self):
+        """
+        In the case when a course is not passed to make_badge_data -- test that make_badge_data catches the exception
+        and returns blank data.
+        """
+        obtained_output = badges.make_badge_data("")
+        ideal_output = {'issuers': {}, 'badge_urls': '[]', 'badges': {}, 'badgeclasses': {}}
+        self.assertEquals(obtained_output, ideal_output)
+
+    def tearDown(self):
+        """
+        Restore the value of _fetch. (not sure if necessary)
+        """
+        badges._fetch = self.old_fetch
+
+
+class BadgeDataTestCase(TestCase):
     """
     Test that badges.make_badge_data behaves correctly on example input.
     """
@@ -179,16 +218,16 @@ class FetchTestCase(TestCase):
                 raise ValueError("badges._fetch calls requests.get without specifying a timeout -- which is bad")
             response = MagicMock()
 
-            if 'test1' in url:
+            if 'testlist' in url:
                 output = {'results': ['list', 'of', 'things'], 'next': None, 'prev': None}
-            elif 'test2.1' in url:
-                output = {'results': ['thing 1', 'thing 2'], 'next': 'test2.2', 'prev': None}
-            elif 'test2.2' in url:
-                output = {'results': ['thing 3'], 'next': None, 'prev': 'test2.1'}
-            elif 'test3' in url:
+            elif 'test_list_1' in url:
+                output = {'results': ['thing 1', 'thing 2'], 'next': 'test_list_2', 'prev': None}
+            elif 'test_list_2' in url:
+                output = {'results': ['thing 3'], 'next': None, 'prev': 'test_list_1'}
+            elif 'test_instance' in url:
                 output = {'dummy JSON object': True}
             else:
-                output = {'results': [], 'next': None}
+                output = None
 
             response.json = output
             return response
@@ -198,12 +237,11 @@ class FetchTestCase(TestCase):
 
         self.old_requests, badges.requests = badges.requests, fake_requests
 
-
     def test_fetch_list(self):
         """
         Test that _fetch returns correctly when reading a single list of objects.
         """
-        obtained_output = badges._fetch('test1')
+        obtained_output = badges._fetch('testlist')
         ideal_output = ['list', 'of', 'things']
         self.assertItemsEqual(ideal_output, obtained_output)
 
@@ -211,7 +249,7 @@ class FetchTestCase(TestCase):
         """
         Test that _fetch returns all pages' lists put together when reading a paginated list of objects.
         """
-        obtained_output = badges._fetch('test2.1')
+        obtained_output = badges._fetch('test_list_1')
         ideal_output = ['thing 1', 'thing 2', 'thing 3']
         self.assertItemsEqual(ideal_output, obtained_output)
 
@@ -219,7 +257,7 @@ class FetchTestCase(TestCase):
         """
         Test that _fetch returns correctly when reading a single object.
         """
-        obtained_output = badges._fetch('test3')
+        obtained_output = badges._fetch('test_instance')
         ideal_output = {'dummy JSON object': True}
         self.assertEqual(ideal_output, obtained_output)
 
