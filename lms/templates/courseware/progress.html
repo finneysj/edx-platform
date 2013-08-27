@@ -69,6 +69,7 @@ ${progress_graph.body(grade_summary, course.grade_cutoffs, "grade-detail-graph",
     badge_service_url = "${settings.BADGE_SERVICE_URL}";
   </script>
 
+  <script type="text/javascript" src="${static.url('js/mustache.js')}"></script>
   <script type="text/javascript" src="${static.url('js/progress_badgelets.js')}"></script>
 %endif
 
@@ -90,7 +91,20 @@ ${progress_graph.body(grade_summary, course.grade_cutoffs, "grade-detail-graph",
       %endif
 
       %if settings.MITX_FEATURES.get('ENABLE_STUDENT_BADGE_DISPLAY_COURSEWARE', False):
-        <div id="badges">
+        <div id="badges" style="display: none">
+          ## A call to progress_badgelets.js adds content to this div. This Mustache template is used.
+          <div style="overflow-x:scroll; overflow-y:hidden; white-space:nowrap;">
+            {{#badgeclasses}}
+              <a href="./badges">
+                {{#is_earned}}
+                  <img src="{{image}}" class="badgelet" title="{{name}}" />
+                {{/is_earned}}
+                {{^is_earned}}
+                  <img src="{{image}}" class="badgelet unlockable" />
+                {{/is_earned}}
+              </a>
+            {{/badgeclasses}}
+          </div>
         </div>
       %endif
 

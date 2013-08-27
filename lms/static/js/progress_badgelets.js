@@ -18,7 +18,7 @@ $(document).ready(function() {
     return $.getJSON(url, function(data){});
   };
 
-  var set_html_to_badges = function(element) {
+  var render_badges = function() {
     //I'd like to terminate this process after a certain time, to prevent hanging when get_badges and
     //get_badgeclasses are pinging the wrong URL. Not sure whether this is possible for a when().
     $.when(get_badges(), get_badgeclasses()).done(function(badges_data, badgeclasses_data) {
@@ -26,41 +26,38 @@ $(document).ready(function() {
       var badgeclasses_list = badgeclasses_data[0].results;
 
       if (badgeclasses_list.length !== 0) {
-        var badges_html = "<div style=\"overflow-x:scroll; overflow-y:hidden; white-space:nowrap;\">";
 
-        for (var i=0; i<badgeclasses_list.length; i++) {
-          var badgeclass = badgeclasses_list[i];
-
-          badges_html += "<a href=\"./badges\"><img src=\""+badgeclass.image+"\" ";
-
-          if (is_earned(badgeclass, badges_list)) {
-            badges_html += "class=\"badgelet\" title=\""+badgeclass.name+"\"";
-          } else {
-            badges_html += "class=\"badgelet unlockable\"";
-          }
-
-          badges_html += " /></a>";
-
+        for (var j=0; j<badgeclasses_list.length; j++) {
+          var badgeclass = badgeclasses_list[j];
+          badgeclass['is_earned'] = is_earned(badgeclass, badges_list);
         }
-        badges_html += "</div>";
 
-        element.html(badges_html);
+        var data = {
+          "badgeclasses": badgeclasses_list,
+        };
+
+        //Render the mustache template in `badges_Element` using the information in `data`.
+        //Replace the html in `badges_element` with the new rendered html.
+        var template = badges_element.html();
+        var badges_html = Mustache.to_html(template, data);
+        badges_element.html(badges_html);
+
+        //Unhide the div. (It was hidden to hide the unrendered template)
+        badges_element.css('display', 'inline');
       }
     });
   };
 
-  //Determine whether a badgeclass has been earned -- whether it is in badges_list.
+  //Determine whether a badgeclass has been earned -- whether it is in badges_list. Return true or false.
   var is_earned = function(badgeclass, badges_list) {
     for (var i=0; i<badges_list.length; i++) {
       if (badges_list[i].badge.indexOf(badgeclass.edx_href) != -1) {
         return true;
       }
-      console.log(badges_list[i].badge);
-      console.log(badgeclass.edx_href);
     }
     return false;
   };
 
-  set_html_to_badges(badges_element);
+  render_badges();
 
 });
