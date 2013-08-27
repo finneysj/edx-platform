@@ -4,7 +4,7 @@ Contains tests for courseware/badges.py
 # Allow accessing protected function _fetch in badges.py:
 # pylint: disable=W0212
 
-from mock import MagicMock
+from mock import MagicMock, patch
 import json
 import requests
 
@@ -13,6 +13,7 @@ from django.test import TestCase
 import courseware.badges as badges
 
 
+@patch('courseware.badges._fetch')
 class BlankBadgeDataTestCase(TestCase):
     """
     Test that badges.make_badge_data behaves correctly on empty inputs.
@@ -29,7 +30,7 @@ class BlankBadgeDataTestCase(TestCase):
                 return []
             else:
                 return {}
-        self.old_fetch, badges._fetch = (badges._fetch, temp_fetch)
+        badges._fetch.side_effect = temp_fetch
 
     def test_blank_data_with_course(self):
         """
@@ -49,13 +50,8 @@ class BlankBadgeDataTestCase(TestCase):
         ideal_output = {'issuers': {}, 'badge_urls': '[]', 'badges': {}, 'badgeclasses': {}}
         self.assertEquals(obtained_output, ideal_output)
 
-    def tearDown(self):
-        """
-        Restore the value of _fetch. (not sure if necessary)
-        """
-        badges._fetch = self.old_fetch
 
-
+@patch('courseware.badges._fetch')
 class FailingBadgeTestCase(TestCase):
     """
     Test that badges.make_badge_data behaves correctly when _fetch throws RequestExceptions.
@@ -68,7 +64,7 @@ class FailingBadgeTestCase(TestCase):
         def temp_fetch(url):
             raise requests.exceptions.RequestException()
 
-        self.old_fetch, badges._fetch = (badges._fetch, temp_fetch)
+        badges._fetch.side_effect = temp_fetch
 
     def test_failing_with_course(self):
         """
@@ -88,13 +84,8 @@ class FailingBadgeTestCase(TestCase):
         ideal_output = {'issuers': {}, 'badge_urls': '[]', 'badges': {}, 'badgeclasses': {}}
         self.assertEquals(obtained_output, ideal_output)
 
-    def tearDown(self):
-        """
-        Restore the value of _fetch. (not sure if necessary)
-        """
-        badges._fetch = self.old_fetch
 
-
+@patch('courseware.badges._fetch')
 class BadgeDataTestCase(TestCase):
     """
     Test that badges.make_badge_data behaves correctly on example input.
@@ -144,7 +135,7 @@ class BadgeDataTestCase(TestCase):
             else:
                 return {}
 
-        self.old_fetch, badges._fetch = (badges._fetch, temp_fetch)
+        badges._fetch.side_effect = temp_fetch
 
     def test_with_course(self):
         """
@@ -190,13 +181,8 @@ class BadgeDataTestCase(TestCase):
             else:
                 self.assertEqual(value1, value2)
 
-    def tearDown(self):
-        """
-        Restore the value of _fetch. (not sure if necesary)
-        """
-        badges._fetch = self.old_fetch
 
-
+@patch('courseware.badges.requests')
 class FetchTestCase(TestCase):
     """
     Tests the _fetch helper method of badges.py.
@@ -232,10 +218,8 @@ class FetchTestCase(TestCase):
             response.json = output
             return response
 
-        fake_requests = MagicMock()
-        fake_requests.get = fake_get
-
-        self.old_requests, badges.requests = badges.requests, fake_requests
+        badges.requests.get = MagicMock()
+        badges.requests.get.side_effect = fake_get
 
     def test_fetch_list(self):
         """
@@ -260,9 +244,3 @@ class FetchTestCase(TestCase):
         obtained_output = badges._fetch('test_instance')
         ideal_output = {'dummy JSON object': True}
         self.assertEqual(ideal_output, obtained_output)
-
-    def tearDown(self):
-        """
-        Restore the original requests (not sure if necessary).
-        """
-        badges.requests = self.old_requests

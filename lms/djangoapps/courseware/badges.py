@@ -1,5 +1,6 @@
 """
-Contains the function make_badge_data, responsible for getting badge data from the badge service.
+Defines BadgeCollection, a class which stores data about badges as various objects, and which fetches this data from
+settings.BADGE_SERVICE_URL when instantiated.
 """
 
 import json
@@ -8,59 +9,51 @@ import requests
 from django.conf import settings
 
 
-def _fetch(url):
+class BadgeCollection(object):
     """
-    Helper method. Reads the JSON object located at a URL. Returns the Python representation of the JSON object.
+    Stores instances of Badge.
 
-    If the fetched JSON object is a paginated list -- with the next url at 'next' and the content at 'results' --
-    this reads through all of the pages, and compiles the results together into one list.
-
-    Throws a RequestException if unsuccessful.
+    Provides helper methods to make retrieving badge data easier from the template.
     """
 
-    # Create absolute URL from relative URL.
-    if not settings.BADGE_SERVICE_URL in url:
-        url = settings.BADGE_SERVICE_URL + url
+    def get_badges(self):
+        """
+        Return all badges.
+        """
+        return self.badges
 
-    obj = requests.get(url, timeout=10).json  # pylint: disable=E1103
+    def get_earned_badges(self):
+        """
+        Return only earned badges.
+        """
+        earned_badges = [badge for badge in self.badges if badge.is_earned]
+        return earned_badges
 
-    results = obj.get('results', None)
+    def get_unlockable_badges(self):
+        """
+        Return only unearned ("unlockable") badges.
+        """
+        unlockable_badges = [badge for badge in self.badges if not badge.is_earned]
+        return unlockable_badges
 
-    # Ensure that next results are obtained, if the output was paginated.
-    if results is not None:
-        next_url = obj.get('next', None)
+    def get_badge_urls(self):
+        """
+        Return a list of URLs pointing to where json
+        """
+        earned_badges = self.get_earned_badges()
+        badge_urls = [badge.href for badge in earned_badges]
+        return json.dumps(badge_urls)
 
-        while next_url is not None:
-            next_obj = requests.get(next_url, timeout=10).json  # pylint: disable=E1103
-            results.extend(next_obj.get('results', []))
-            next_url = next_obj.get('next', None)
+    def __init__(self, email, course_id=None):
+        """
+        Create a BadgeCollection by fetching data from the badging service about the badges belonging to `email`.
 
-        return results
+        If `course_id` is specified, only those badges specific to that course will be returned, including both
+        earned badges and unearned badges.
 
-    else:
-        return obj
-
-
-
-def make_badge_data(email, course_id=None):
-    """
-    Performs GET requests to the badge service to return data suitable for displaying badges.
-
-    `email` -- the email of the badge recipient (i.e. student)
-    `course_id` -- a course id
-
-    Returns a dictionary:
-        'badges': a dictionary --
-            {badge's badgeclass's href: badge data, for badge in all badges this student has earned}
-        'badgeclasses': a dictionary --
-            {badgeclass's href: badgeclass data, for badgeclass in all badgeclasses for this course}
-        'issuers': a dictionary --
-            {issuer's href: issuer data, for issuer in all issuers referenced by all badgeclasses for this course}
-        'badge_urls': a string contain JSON dump of a list of URLs; the URLs link to the JSON where
-            each earned badge may be accessed, at the badge service
-    """
-
-    try:
+        If `course_id` is not specified, then all of the earned badges belonging to `email` will be returned, without
+        information about unearned badges.
+        """
         if course_id is not None:
 
             # Filter badges by the student's email and by the course ID.
@@ -80,46 +73,178 @@ def make_badge_data(email, course_id=None):
                 for badge in raw_badges
             ]
 
-        # Format badgeclasses into a dictionary -- badgeclass_url: badgeclass_data
-        badgeclasses = dict([
-            (badgeclass['edx_href'], badgeclass)
-            for badgeclass in raw_badgeclasses
-        ])
-
-        # Format badges into a dictionary -- badgeclass_url: badge_data
-        badges = dict([
+        # Reformat raw_badges into this dictionary -- badgeclass_url: badge_data
+        # Note that badgeclass_url is stored under the keyword 'badge'
+        badges_dict = dict(
             (badge['badge'], badge)
             for badge in raw_badges
-        ])
+        )
 
-        # Get the list of URLs to access to export badges to Mozilla.
-        badge_urls = [
-            badge['edx_href']
-            for badge in badges.values()
-            if badge is not None and 'edx_href' in badge
-        ]
+        # Create self.badges.
+        self.badges = []
+        issuers_dict = {}
 
-        # Fetch data about the issuer.
-        issuers = {}
-        for badgeclass in badgeclasses.values():
-            issuer_url = badgeclass['issuer']
-            if issuer_url not in issuers.keys():
-                issuers.update({issuer_url: _fetch(issuer_url)})
+        for badgeclass_info in raw_badgeclasses:
 
-        output = {
-            'badges': badges,
-            'badgeclasses': badgeclasses,
-            'issuers': issuers,
-            'badge_urls': json.dumps(badge_urls),
-        }
+            badgeclass = Badgeclass(badgeclass_info)
 
-        return output
+            # Keep track of which issuers have already been fetched, so that they don't need to be fetched twice.
+            issuer_url = badgeclass.issuer
+            if issuer_url not in issuers_dict.keys():
+                issuer_info = _fetch(issuer_url)
+                issuers_dict.update({issuer_url: issuer_info})
 
+            issuer_info = issuers_dict[issuer_url]
+            issuer = Issuer(issuer_info)
+
+            # Instantiate the badge according to whether it has been earned or not.
+            if badgeclass.href in badges_dict.keys():
+                badge_info = badges_dict[badgeclass.href]
+                badge = EarnedBadge(badge_info, badgeclass, issuer)
+            else:
+                badge = Badge(badgeclass, issuer)
+
+            self.badges.append(badge)
+
+
+class Badge(object):
+    """
+    Stores data about an unearned badge.
+    """
+    def __init__(self, badgeclass, issuer):
+        """
+        Create a badge, storing its badgeclass and issuer.
+
+        `badgeclass` an instance of Badgeclass
+        `issuer` an instance of Issuer
+
+        Raises TypeError if objects of incorrect type are passed in.
+        Raises BadgingServiceError if improperly formatted data is passed in.
+        """
+        if type(badgeclass) is not Badgeclass:
+            raise TypeError('Passed in a non-Badgeclass to Badge.__init__')
+        if type(issuer) is not Issuer:
+            raise TypeError('Passed in a non-Issuer to Badge.__init__')
+
+        self.badgeclass = badgeclass
+        self.issuer = issuer
+        self.is_earned = False
+
+
+class EarnedBadge(Badge):
+    """
+    Stores data about an earned badge (a superset of the data stored about an unearned badge). Subclass of Badge.
+    """
+    def __init__(self, badge_info, badgeclass, issuer):
+        """
+        Use a subset of the data in badge_info to instantiate this badge.
+
+        `badge_info` the JSON object about this badge that the badging service returned, already parsed from JSON
+        `badgeclass` an instance of Badgeclass
+        `issuer` an instance of Issuer
+
+        Raises TypeError if objects of incorrect type are passed in.
+        Raises BadgingServiceError if improperly formatted data is passed in.
+        """
+        super(EarnedBadge, self).__init__(badgeclass, issuer)
+
+        try:
+            self.href = badge_info['edx_href']
+            self.image = badge_info['image']
+            self.issued_on = badge_info['issuedOn']
+        except KeyError:
+            raise BadgingServiceError('Improperly formatted badge information')
+
+        self.is_earned = True
+
+class Badgeclass(object):
+    """
+    Stores data about a badgeclass -- all of the generic information defining a badge.
+    """
+    def __init__(self, badgeclass_info):
+        """
+        Use a subset of the data in badgeclass_info to instantiate this badgeclass.
+
+        `badgeclass_info` the JSON object about this badgeclass that the badging service returned, already parsed from JSON
+
+        Raises BadgingServiceError if improperly formatted data is passed in.
+        """
+        try:
+            self.href = badgeclass_info['edx_href']
+            self.issuer = badgeclass_info['issuer']
+            self.name = badgeclass_info['name']
+            self.description = badgeclass_info['description']
+            self.criteria = badgeclass_info['criteria']
+            self.image = badgeclass_info['image']
+            self.number_awarded = badgeclass_info['edx_number_awarded']
+        except KeyError:
+            raise BadgingServiceError('Improperly formatted badgeclass information')
+
+
+class Issuer(object):
+    """
+    Stores data about the issuer of a badge.
+    """
+    def __init__(self, issuer_info):
+        """
+        Use a subset of the data in issuer_info to instantiate this issuer.
+
+        `issuer_info` the JSON object about this issuer that the badging service returned, already parsed from JSON
+
+        Raises BadgingServiceError if improperly formatted data is passed in.
+        """
+        try:
+            self.href = issuer_info['edx_href']
+            self.name = issuer_info['name']
+            self.url = issuer_info['url']
+            self.course = issuer_info['edx_course']
+        except KeyError:
+            raise BadgingServiceError('Improperly formatted issuer information')
+
+
+
+def _fetch(url):
+    """
+    Helper method. Reads the JSON object located at a URL. Returns the Python representation of the JSON object.
+
+    If the fetched JSON object is a paginated list -- with the next url at 'next' and the content at 'results' --
+    this reads through all of the pages, and compiles the results together into one list.
+
+    Throws a BadgingServiceError if unsuccessful.
+    """
+
+    # Create absolute URL from relative URL.
+    if not settings.BADGE_SERVICE_URL in url:
+        url = settings.BADGE_SERVICE_URL + url
+
+    try:
+        obj = requests.get(url, timeout=10).json  # pylint: disable=E1103 -- .json is OK for our version of requests
     except requests.exceptions.RequestException:
-        print 'Warning: Badge service inaccessible? Failed to locate badges.'
-        return {
-            'badges': {},
-            'badgeclasses': {},
-            'issuers': {},
-            'badge_urls': json.dumps([]),
-        }
+        raise BadgingServiceError('URL not found: {url}'.format(url=url))
+
+
+    results = obj.get('results', None)
+
+    # Ensure that next results are obtained, if the output was paginated.
+    if results is not None:
+        next_url = obj.get('next', None)
+
+        while next_url is not None:
+            try:
+                next_obj = requests.get(next_url, timeout=10).json  # pylint: disable=E1103
+            except requests.exceptions.RequestException:
+                raise BadgingServiceError('URL not found: {url}'.format(url=url))
+            results.extend(next_obj.get('results', []))
+            next_url = next_obj.get('next', None)
+
+        return results
+
+    else:
+        return obj
+
+
+class BadgingServiceError(StandardError):
+    """
+    Custom class for passing around errors representing improper behavior by the badging service.
+    """
+    pass

@@ -18,7 +18,7 @@ from markupsafe import escape
 
 from courseware import grades
 from courseware.access import has_access
-from courseware.badges import make_badge_data
+from courseware.badges import BadgeCollection, BadgingServiceError
 from courseware.courses import (get_courses, get_course_with_access,
                                 get_courses_by_university, sort_by_announcement)
 import courseware.tabs as tabs
@@ -727,8 +727,17 @@ def badges(request, course_id):
         'course': course,
         'student': request.user,
     }
-    context.update(make_badge_data(request.user.email, course.id))
-
+    try:
+        badge_collection = BadgeCollection(request.user.email, course.id)
+        context.update({
+            'badge_collection': badge_collection,
+            'badges_success': True,
+        })
+    except BadgingServiceError as e:
+        context.update({
+            'badge_error_message': e.message,
+            'badges_success': False,
+        })
     return render_to_response('courseware/badges.html', context)
 
 

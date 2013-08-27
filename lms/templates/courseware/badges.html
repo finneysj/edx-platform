@@ -57,33 +57,29 @@ img.share_icon {
 </style>
 
 <%block name="js_extra">
-<script type="text/javascript" src="http://beta.openbadges.org/issuer.js"></script>
-<script type="text/javascript">
-
-$(document).ready(function() {
-
-  var start_info_button = function() {
-      $('.mozilla_info').hide();
-  };
-  start_info_button();
-
-  $('.mozilla_export').click(function() {
-    OpenBadges.issue(${badge_urls}, function(e,s) {});
+% if badges_success:
+  <script type="text/javascript" src="http://beta.openbadges.org/issuer.js"></script>
+  <script type="text/javascript">
+  $(document).ready(function() {
+    var start_info_button = function() {
+        $('.mozilla_info').hide();
+    };
+    start_info_button();
+    $('.mozilla_export').click(function() {
+      OpenBadges.issue(${badge_collection.get_badge_urls()}, function(e,s) {});
+    });
+    var flip_info_button = function() {
+      if (!$(this).parent().find('.mozilla_info').is(":visible")) {
+        $('.mozilla_info').hide('blind', 100);
+        $(this).parent().find('.mozilla_info').show('blind', 100).animate({queue: false});
+      } else {
+        $('.mozilla_info').hide('blind', 100);
+      }
+    };
+    $('.toggle_mozilla').click(flip_info_button);
   });
-
-  var flip_info_button = function() {
-    if (!$(this).parent().find('.mozilla_info').is(":visible")) {
-      $('.mozilla_info').hide('blind', 100);
-      $(this).parent().find('.mozilla_info').show('blind', 100).animate({queue: false});
-    } else {
-      $('.mozilla_info').hide('blind', 100);
-    }
-  };
-
-  $('.toggle_mozilla').click(flip_info_button);
-});
-
-</script>
+  </script>
+%endif
 </%block>
 
 
@@ -97,118 +93,109 @@ $(document).ready(function() {
         <h1>${_('Badges for {course_name}').format(course_name='<i>'+course.display_name+'</i>')}</h1>
       </header>
 
-      %if len(badgeclasses) != 0 or len(badges) != 0:
-      <ol class="chapters">
-        %if len(badges) > 0:
-        <li>
-          <h2>${_("Earned")}</h2>
-          <ol class="sections">
-            <%first = True%>
+      %if not badges_success:
+        <p>Error with fetching badges: ${badge_error_message}</p>
+      %else:
+        %if not len(badge_collection.get_badges()) > 0:
+         <p>${_('No badges to display.')}</p>
+        %else:
+        <ol class="chapters">
+          %if len(badge_collection.get_earned_badges()) > 0:
+          <li>
+            <h2>${_("Earned")}</h2>
+            <ol class="sections">
+              <% first = True %>
 
-            %for badge in badges.values():
-              <%badgeclass_url = badge.get('badge', {})%>
-              <%badgeclass = badgeclasses.get(badgeclass_url, {})%>
-              <%issuer = issuers.get(badgeclass.get('issuer'), {})%>
-              <%num = badgeclass['edx_number_awarded']%>
-
-              %if first:
-                <%first = False%>
-              %else:
-                <hr style="clear:both;"/>
-              %endif
-
-              <li>
-                <a href="${badgeclass.get('criteria')}">
-                  <img src="${badge.get('image')}" class="badge_image" />
-                </a>
-                <p>
-                  <div class="fakelink toggle_mozilla" title="${_("Export Badges to Mozilla Backpack")}">
-                    <!--This image is a modified version of the images at http://openbadges.org/insignia/-->
-                    <img class="share_icon" src="/static/images/badges/open_badges.png" />
-                  </div>
-                  <a target="_blank" title="${_("Share")}" href="https://plus.google.com/share?url=${badgeclass.get('criteria')}">
-                    <img class="share_icon" src="/static/images/badges/social_googleplus.png" />
-                  </a>
-                  <a target="_blank" title="${_("Tweet")}" href="https://twitter.com/intent/tweet?text=I earned the %22${badgeclass.get('name')}%22 badge in ${course.number} on %23edX!&url=${badgeclass.get('criteria')}">
-                    <img class="share_icon" src="/static/images/badges/social_twitter.png" />
-                  </a>
-                  <a target="_blank" title="${_("Share")}" href="https://www.facebook.com/dialog/feed?app_id=202824819884271&link=${badgeclass.get('criteria')}&picture=${badge.get('image')}&name=${badgeclass.get('name')}&description=${badgeclass.get('description')}&redirect_uri=http://www.edx.org/">
-                    <img class="share_icon" src="/static/images/badges/social_facebook.png" />
-                  </a>
-                </p>
-                <div style="padding-left:120px">
-                  <h3>${badgeclass.get('name')}</h3>
-                  <p>
-                    <b>${badgeclass.get('description')}</b><br />
-                    %if issuer.get('name', False):
-                      ${_('awarded on {date} by {issuer}').format(
-                        date='<b>'+badge.get('issuedOn')+'</b>',
-                        issuer="<a href=\"" + issuer.get('origin', '') + "\">" + issuer.get('name') + "</a>")
-                      }
-                    %else:
-                      ${_('awarded on {date}').format(date='<b>'+badge.get('issuedOn')+'</b>')}
-                    %endif
-                    <br />
-                    <i>
-                    %if num is not None:
-                      ${_('{number} people have this badge.').format(number=num)}
-                    %endif
-                    </i>
-                  </p>
-                  <div class="mozilla_info" style="display: none;">
-                    <hr/>
-                    <p>
-                      <input type='button' class='mozilla_export' value='${_('Export')}' />
-                      ${_('Exporting these badges to <a href="http://beta.openbadges.org">Mozilla Backpack</a>? When signing in with Mozilla Persona, make sure to use your <b>{email}</b> email address.').format(email=student.email)}
-                    </p>
-                  </div>
-                </div>
-              </li>
-            %endfor
-          </ol>
-        </li>
-        %endif
-        %if len(badgeclasses) > len(badges):
-        <li>
-          <h2>${_('Unlockable')}</h2>
-          <ol class="sections">
-            <%first = True%>
-
-            %for key in badgeclasses.keys():
-              %if not key in badges.keys():
-                <%badgeclass = badgeclasses.get(key)%>
-                <%num = badgeclass.get('edx_number_awarded')%>
-
+              %for earned_badge in badge_collection.get_earned_badges():
+                <% badgeclass = earned_badge.badgeclass %>
                 %if first:
-                  <%first = False%>
+                  <% first = False %>
                 %else:
                   <hr style="clear:both;"/>
                 %endif
 
                 <li>
-                  <a href="${badgeclass.get('criteria')}">
-                    <img src="${badgeclass.get('image')}" class="unlockable badge_image" />
+                  <a href="${badgeclass.criteria}">
+                    <img src="${earned_badge.image}" class="badge_image" />
+                  </a>
+                  <p>
+                    <div class="fakelink toggle_mozilla" title="${_("Export Badges to Mozilla Backpack")}">
+                      <!--This image is a modified version of the images at http://openbadges.org/insignia/-->
+                      <img class="share_icon" src="/static/images/badges/open_badges.png" />
+                    </div>
+                    <a target="_blank" title="${_("Share")}" href="https://plus.google.com/share?url=${badgeclass.criteria}">
+                      <img class="share_icon" src="/static/images/badges/social_googleplus.png" />
+                    </a>
+                    <a target="_blank" title="${_("Tweet")}" href="https://twitter.com/intent/tweet?text=I earned the %22${badgeclass.name}%22 badge in ${course.number} on %23edX!&url=${badgeclass.criteria}">
+                      <img class="share_icon" src="/static/images/badges/social_twitter.png" />
+                    </a>
+                    <a target="_blank" title="${_("Share")}" href="https://www.facebook.com/dialog/feed?app_id=202824819884271&link=${badgeclass.criteria}&picture=${earned_badge.image}&name=${badgeclass.name}&description=${badgeclass.description}&redirect_uri=http://www.edx.org/">
+                      <img class="share_icon" src="/static/images/badges/social_facebook.png" />
+                    </a>
+                  </p>
+                  <div style="padding-left:120px">
+                    <h3>${badgeclass.name}</h3>
+                    <p>
+                      <b>${badgeclass.description}</b><br />
+                      ${_('awarded on {date} by {issuer}').format(
+                        date='<b>'+earned_badge.issued_on+'</b>',
+                        issuer="<a href=\"" + earned_badge.issuer.url + "\">" + earned_badge.issuer.name + "</a>")
+                      }
+                      <br />
+                      <i>
+                      ${_('{number} people have this badge.').format(number=badgeclass.number_awarded)}
+                      </i>
+                    </p>
+                    <div class="mozilla_info" style="display: none;">
+                      <hr/>
+                      <p>
+                        <input type='button' class='mozilla_export' value='${_('Export')}' />
+                        ${_('Exporting these badges to <a href="http://beta.openbadges.org">Mozilla Backpack</a>? When signing in with Mozilla Persona, make sure to use your <b>{email}</b> email address.').format(email=student.email)}
+                      </p>
+                    </div>
+                  </div>
+                </li>
+              %endfor
+            </ol>
+          </li>
+          %endif
+          %if len(badge_collection.get_unlockable_badges()) > 0:
+          <li>
+            <h2>${_('Unlockable')}</h2>
+            <ol class="sections">
+              <% first = True %>
+
+              %for badge in badge_collection.get_unlockable_badges():
+                <% badgeclass = badge.badgeclass %>
+
+                %if first:
+                  <% first = False %>
+                %else:
+                  <hr style="clear:both;"/>
+                %endif
+
+                <li>
+                  <a href="${badgeclass.criteria}">
+                    <img src="${badgeclass.image}" class="unlockable badge_image" />
                   </a>
                   <div style="padding-left:120px">
                     <p>
-                    <b>${badgeclass.get('description')} </b><br />
+                    <b>${badgeclass.description} </b><br />
                     <i>
                     %if num is not None:
-                      ${_('{number} people have this badge.').format(number=num)}
+                      ${_('{number} people have this badge.').format(number=badgeclass.number_awarded)}
                     %endif
                     </i>
                     </p>
                   </div>
                 </li>
-              %endif
-            %endfor
-          </ol>
-        </li>
+              %endfor
+            </ol>
+          </li>
+          %endif
+        </ol>
+        <a href="http://openbadges.org/" style="float:right"><img src="/static/images/badges/openbadges_insignia_weissue.png" /></a>
         %endif
-      </ol>
-      <a href="http://openbadges.org/" style="float:right"><img src="/static/images/badges/openbadges_insignia_weissue.png" /></a>
-      %else:
-       <p>${_('No badges found.')}</p>
       %endif
 
     </section>
