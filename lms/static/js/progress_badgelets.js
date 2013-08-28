@@ -21,38 +21,37 @@ $(document).ready(function() {
 
                 if (badgeclasses_list.length !== 0) {
 
-                    for (var j=0; j<badgeclasses_list.length; j++) {
-                        var badgeclass = badgeclasses_list[j];
-                        badgeclass['is_earned'] = is_earned(badgeclass, badges_list);
-                    }
+                    // Add an attribute to each badgeclass for whether it has been earned or not.
+                    badgeclasses_list = _.map(badgeclasses_list, function(badgeclass) {
+                        badgeclass.is_earned = is_earned(badgeclass, badges_list);
+                        return badgeclass;
+                    });
 
                     var data = {
                         "badgeclasses": badgeclasses_list,
                     };
 
-                    //Render the mustache template in `badges_Element` using the information in `data`.
-                    //Replace the html in `badges_element` with the new rendered html.
+                    // Render the mustache template in `badges_Element` using the information in `data`.
+                    // Replace the html in `badges_element` with the new rendered html.
                     var template = badges_element.html();
                     var badges_html = Mustache.to_html(template, data);
                     badges_element.html(badges_html);
 
-                    //Unhide the div. (It was hidden to hide the unrendered template)
+                    // Unhide the div. (It was hidden to hide the unrendered template)
                     badges_element.css('display', 'inline');
                 }
             }
         );
     };
 
-    //Determine whether a badgeclass has been earned -- whether it is in badges_list. Return true or false.
+    // Determine whether a badgeclass has been earned -- whether it is in badges_list. Return true or false.
     var is_earned = function(badgeclass, badges_list) {
-        for (var i=0; i<badges_list.length; i++) {
-            if (badges_list[i].badge.indexOf(badgeclass.edx_href) != -1) {
-                return true;
-            }
-        }
-        return false;
+        badgeclass_urls = _.map(badges_list, function(badge) {return badge.badge;});
+        badgeclass_url = badgeclass.edx_href + ".json";
+        return _.contains(badgeclass_urls, badgeclass_url);
     };
 
+    // Call render_badges.
     render_badges();
 
 });
