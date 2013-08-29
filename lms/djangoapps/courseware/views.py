@@ -733,9 +733,9 @@ def badges(request, course_id):
             'badge_collection': badge_collection,
             'badges_success': True,
         })
-    except BadgingServiceError as e:
+    except BadgingServiceError as error:
         context.update({
-            'badge_error_message': e.message,
+            'badge_error_message': error.message,
             'badges_success': False,
         })
     return render_to_response('courseware/badges.html', context)

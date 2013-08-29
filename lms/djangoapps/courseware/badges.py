@@ -157,6 +157,7 @@ class EarnedBadge(Badge):
 
         self.is_earned = True
 
+
 class Badgeclass(object):
     """
     Stores data about a badgeclass -- all of the generic information defining a badge.
@@ -202,7 +203,6 @@ class Issuer(object):
             raise BadgingServiceError('Improperly formatted issuer information')
 
 
-
 def _fetch(url):
     """
     Helper method. Reads the JSON object located at a URL. Returns the Python representation of the JSON object.
@@ -218,10 +218,9 @@ def _fetch(url):
         url = settings.BADGE_SERVICE_URL + url
 
     try:
-        obj = requests.get(url, timeout=10).json  # pylint: disable=E1103 -- .json is OK for our version of requests
+        obj = requests.get(url, timeout=10).json  # (.json is OK for our version of requests) # pylint: disable=E1103
     except requests.exceptions.RequestException:
         raise BadgingServiceError('URL not found: {url}'.format(url=url))
-
 
     results = obj.get('results', None)
 

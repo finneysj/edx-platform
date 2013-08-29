@@ -5,8 +5,6 @@ Contains tests for courseware/badges.py
 # pylint: disable=W0212
 
 from mock import MagicMock, patch
-import hashlib
-import pickle
 
 from django.test import TestCase
 
@@ -26,18 +24,20 @@ class BlankBadgeDataTestCase(TestCase):
             """
             Returns blank fake data depending on the URL passed in.
             """
-            raise Exception()
             if 's/.json' in url:  # list endpoint
                 return []
             else:
                 return {}
-        badges._fetch.side_effect = temp_fetch
+
+        self.temp_fetch = temp_fetch
 
     def test_blank_data_with_course(self, mock_fetch):
         """
         In the case when a course is passed to make_badge_data -- test that make_badge_data returns
         what it should.
         """
+        mock_fetch.side_effect = self.temp_fetch
+
         output = badges.BadgeCollection('', '')
         self.assertEquals(output.get_badges(), [])
         self.assertEquals(output.get_earned_badges(), [])
@@ -49,6 +49,8 @@ class BlankBadgeDataTestCase(TestCase):
         In the case when a course is not passed to make_badge_data -- test that make_badge_data returns
         what it should.
         """
+        mock_fetch.side_effect = self.temp_fetch
+
         output = badges.BadgeCollection('')
         self.assertEquals(output.get_badges(), [])
         self.assertEquals(output.get_earned_badges(), [])
@@ -67,16 +69,20 @@ class FailingBadgeTestCase(TestCase):
         when the requests library is unable to access the badge server.
         """
         def temp_fetch(url):
-            raise Exception()
+            """
+            Raise BadgingServiceError, imitating a _fetch method that always fails.
+            """
             raise badges.BadgingServiceError()
 
-        badges._fetch.side_effect = temp_fetch
+        self.temp_fetch = temp_fetch
 
     def test_failing_with_course(self, mock_fetch):
         """
         In the case when a course is passed to BadgeCollection.__init__ -- test that it catches the exception
         and returns blank data.
         """
+        mock_fetch.side_effect = self.temp_fetch
+
         output = badges.BadgeCollection("", "")
         self.assertEquals(output.get_badges(), [])
         self.assertEquals(output.get_earned_badges(), [])
@@ -88,6 +94,8 @@ class FailingBadgeTestCase(TestCase):
         In the case when a course is not passed to BadgeCollection.__init__ -- test that it catches the exception
         and returns blank data.
         """
+        mock_fetch.side_effect = self.temp_fetch
+
         output = badges.BadgeCollection("")
         self.assertEquals(output.get_badges(), [])
         self.assertEquals(output.get_earned_badges(), [])
