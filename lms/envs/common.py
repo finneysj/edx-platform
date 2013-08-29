@@ -477,7 +477,7 @@ JASMINE_TEST_DIRECTORY = PROJECT_ROOT + '/static/coffee'
 
 ################################# Badge service ################################
 # Should update this with the URL of the badge service once deployed.
-BADGE_SERVICE_URL = 'http://badges.edx.org/'
+BADGE_SERVICE_URL = 'http://dummy_url_to_replace_later.edx.org/'
 
 ################################# Middleware ###################################
 # List of finder classes that know how to find static files in
