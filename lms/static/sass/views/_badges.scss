@@ -15,29 +15,27 @@
     opacity: 0.5;
     -ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=50)";
     filter: alpha(opacity=50);
-    -moz-opacity:0.5;
-    -khtml-opacity: 0.5;
   }
 
   input.mozilla_export {
     float: right;
     width: auto;
-    margin-left: 20px;
+    margin-left: $baseline;
   }
 
   img.badge_image {
     float: left;
-    width: 100px;
-    margin-right: 20px;
-    margin-bottom: 20px;
+    width: ($baseline*5);
+    margin-right: $baseline;
+    margin-bottom: $baseline;
     border-radius: 3px;
   }
 
   img.share_icon {
     float: right;
-    width: 20px;
+    width: $baseline;
     padding: 3px;
-    border-radius: 5px;
+    border-radius: ($baseline/4);
   }
 
   .fakelink:hover {
