@@ -89,14 +89,16 @@ clone_repos() {
         if [[ -d "$BASE/edx-platform/.git" ]]; then
             output "Pulling edx platform"
             cd "$BASE/edx-platform"
-            git pull
+			error "Update git repo by hand!"
+            # git pull
         else
             output "Cloning edx platform"
             if [[ -d "$BASE/edx-platform" ]]; then
                 output "Creating backup for existing edx platform"
                 mv "$BASE/edx-platform" "${BASE}/edx-platform.bak.$$"
             fi
-            git clone https://github.com/edx/edx-platform.git
+            git clone https://github.com/finneysj/edx-platform.git
+			git remote add upstream git://github.com/edx/edx-platform.git
         fi
     fi
 }

@@ -1283,10 +1283,12 @@ class CustomResponse(LoncapaResponse):
 
         but for simplicity, if an "expect" attribute was given by the content author
         ie <customresponse expect="foo" ...> then that.
+
+        --sjf: if "correct_answer" is specified, it should override "expect"
         '''
         if len(self.answer_ids) > 1:
             return self.default_answer_map
-        if self.expect:
+        if len(self.default_answer_map) < 1 and self.expect:
             return {self.answer_ids[0]: self.expect}
         return self.default_answer_map
 
