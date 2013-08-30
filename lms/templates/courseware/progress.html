@@ -26,43 +26,6 @@ ${progress_graph.body(grade_summary, course.grade_cutoffs, "grade-detail-graph",
 </script>
 
 %if settings.MITX_FEATURES.get('ENABLE_STUDENT_BADGE_DISPLAY_COURSEWARE', False):
-  <style>
-    img.badgelet {
-      margin: 10px;
-      height: 60px;
-      border-radius: 3px;
-    }
-    img.badgelet:hover {
-      opacity: 0.5;
-      -ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=50)";
-      filter: alpha(opacity=50);
-      -moz-opacity:0.5;
-      -khtml-opacity: 0.5;
-    }
-    img.unlockable {
-              filter: url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\'><filter id=\'grayscale\'><feColorMatrix type=\'matrix\' values=\'0.3333 0.3333 0.3333 0 0 0.3333 0.3333 0.3333 0 0 0.3333 0.3333 0.3333 0 0 0 0 0 1 0\'/></filter></svg>#grayscale"); /* Firefox 10+, Firefox on Android */
-              filter: grayscale( 100% );
-              filter: gray;
-      -webkit-filter: grayscale( 100% );
-         -moz-filter: grayscale( 100% );
-           -o-filter: grayscale( 100% );
-          -ms-filter: grayscale( 100% );
-
-      opacity: 0.6;
-      -ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=60)";
-      filter: alpha(opacity=60);
-      -moz-opacity:0.6;
-      -khtml-opacity: 0.6;
-    }
-    img.unlockable:hover {
-      opacity: 0.3;
-      -ms-filter:"progid:DXImageTransform.Microsoft.Alpha(Opacity=30)";
-      filter: alpha(opacity=30);
-      -moz-opacity:0.3;
-      -khtml-opacity: 0.3;
-    }
-  </style>
-
   <script>
     email = "${student.email}";
     course_id = "${course.id}";
@@ -91,7 +54,7 @@ ${progress_graph.body(grade_summary, course.grade_cutoffs, "grade-detail-graph",
       %endif
 
       %if settings.MITX_FEATURES.get('ENABLE_STUDENT_BADGE_DISPLAY_COURSEWARE', False):
-        <div id="badges" style="display: none">
+        <div class="ui-badges" id="badges" style="display: none">
           ## A call to progress_badgelets.js adds content to this div. This Mustache template is used.
           <div style="overflow-x:scroll; overflow-y:hidden; white-space:nowrap;">
             {{#badgeclasses}}
